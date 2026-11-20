@@ -395,3 +395,27 @@ def compare_with_baselines(data_missing, columns, params, n_probes=2, probe_rate
     err, ks = sum(errs) / n_probes, sum(kss) / n_probes
     err.loc["AVERAGE"], ks.loc["AVERAGE"] = err.mean(), ks.mean()
     return err, ks
+
+
+def benchmark_guesses(data_missing, columns, params, probe_rate=0.10, random_state=0):
+    """
+    One hidden-value test for plotting. Returns {column: DataFrame} where each DataFrame has the
+    real hidden values and the guesses of Mean, Median, KNN and CWI-kNN for those same cells.
+    (Uses the same hidden cells as the first test inside compare_with_baselines.)
+    """
+    rng = np.random.default_rng(random_state)
+    base = data_missing[columns]
+    probed, probe = _hide_known(base, columns, rng, probe_rate)
+    guesses = {"Mean": _run_candidate("mean", probed, columns),
+               "Median": _run_candidate("median", probed, columns),
+               "KNN": _run_candidate("knn", probed, columns),
+               "CWI-kNN (ours)": cwi_knn_impute(probed, columns, **params,
+                                               random_state=random_state)[columns]}
+    out = {}
+    for c in columns:
+        m = probe[c].values
+        d = {"Real (hidden)": base.loc[m, c].values}
+        for name, g in guesses.items():
+            d[name] = g.loc[m, c].values
+        out[c] = pd.DataFrame(d)
+    return out
